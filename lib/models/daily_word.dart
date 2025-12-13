@@ -10,4 +10,22 @@ class DailyWord {
     required this.scripture,
     required this.pastorNote,
   });
+
+  factory DailyWord.fromMap(Map<String, dynamic> data) {
+    return DailyWord(
+      date: data['date'] ?? '',
+      reference: data['reference'] ?? '',
+      scripture: data['scripture'] ?? '',
+      pastorNote: data['pastorNote'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'date': date,
+      'reference': reference,
+      'scripture': scripture,
+      'pastorNote': pastorNote,
+    };
+  }
 }

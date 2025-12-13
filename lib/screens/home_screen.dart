@@ -6,6 +6,8 @@ import '../data/mock_data.dart'; // accessing constants directly for now
 import '../theme/app_theme.dart';
 import '../providers/app_provider.dart';
 import '../widgets/streak_modal.dart';
+import 'profile_screen.dart';
+import 'qt_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -13,60 +15,159 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // In a real app, these might come from a provider
-    const user = currentUser;
-    const word = todaysWord;
+    final user = context.watch<AppProvider>().user;
+    final word = todaysWord;
     final streak = context.watch<AppProvider>().streak;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50], // Match React bg-gray-50
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header: User & Streak
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(2), // Gradient border effect simulation
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF6366F1), Color(0xFF9333EA)], // indigo-500 to purple-600
-                        ),
-                        shape: BoxShape.circle,
-                      ),
-                      child: CircleAvatar(
-                        radius: 20,
-                        backgroundColor: Colors.white,
-                        child: CircleAvatar(
-                          radius: 18,
-                          backgroundImage: NetworkImage(user.avatarUrl),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: Colors.grey[50],
+      drawer: user != null ? Drawer(
+        child: SafeArea(
+          child: Column(
+            children: [
+              UserAccountsDrawerHeader(
+                decoration: const BoxDecoration(color: AppTheme.primary),
+                accountName: Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                accountEmail: Text(user.email),
+                currentAccountPicture: CircleAvatar(
+                  backgroundColor: Colors.white,
+                  backgroundImage: NetworkImage(user.avatarUrl),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(LucideIcons.user, color: AppTheme.primary),
+                title: const Text('내 정보'),
+                onTap: () {
+                  Navigator.pop(context); // Close drawer
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  );
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(LucideIcons.logOut, color: Colors.red),
+                title: const Text('로그아웃', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context); // Close drawer
+                  context.read<AppProvider>().logout();
+                },
+              ),
+            ],
+          ),
+        ),
+      ) : null, // No drawer if not logged in
+      body: Builder(
+        builder: (context) => SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header: User & Streak
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      if (user == null) {
+                        // Show Login Dialog
+                        showDialog(
+                          context: context,
+                          builder: (context) => Dialog(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('로그인', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 16),
+                                  const TextField(
+                                    autofillHints: [AutofillHints.email],
+                                    decoration: InputDecoration(
+                                      labelText: '이메일',
+                                      prefixIcon: Icon(LucideIcons.mail),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const TextField(
+                                    obscureText: true,
+                                    autofillHints: [AutofillHints.password],
+                                    decoration: InputDecoration(
+                                      labelText: '비밀번호',
+                                      prefixIcon: Icon(LucideIcons.lock),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        context.read<AppProvider>().login();
+                                        Navigator.pop(context);
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.primary,
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                      ),
+                                      child: const Text('로그인'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      } else {
+                        // Open Aside (Drawer)
+                        Scaffold.of(context).openDrawer();
+                      }
+                    },
+                    child: Row(
                       children: [
-                        Text(
-                          '환영합니다 👋',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[500],
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.primaryGradient,
+                            shape: BoxShape.circle,
+                          ),
+                          child: CircleAvatar(
+                            radius: 20,
+                            backgroundColor: Colors.white,
+                            child: CircleAvatar(
+                              radius: 18,
+                              backgroundImage: user != null ? NetworkImage(user.avatarUrl) : null,
+                              child: user == null ? const Icon(LucideIcons.user, color: Colors.grey) : null,
+                            ),
                           ),
                         ),
-                        Text(
-                          user.name,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user != null ? '환영합니다 👋' : '로그인이 필요합니다',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                            Text(
+                              user != null ? user.name : '게스트',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
                 GestureDetector(
                   onTap: () {
                     showDialog(
@@ -94,13 +195,11 @@ class HomeScreen extends StatelessWidget {
                           width: 32,
                           height: 32,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFFB923C), Color(0xFFEF4444)], // orange-400 to red-500
-                            ),
+                            gradient: AppTheme.pointGradient,
                             borderRadius: BorderRadius.circular(8),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFFFED7AA).withOpacity(0.5), // orange-200
+                                color: AppTheme.point.withOpacity(0.5),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4),
                               ),
@@ -122,10 +221,10 @@ class HomeScreen extends StatelessWidget {
                             ),
                             Text(
                               '$streak일째',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFFEA580C), // orange-600
+                                color: AppTheme.point[700],
                               ),
                             ),
                           ],
@@ -161,9 +260,7 @@ class HomeScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(20),
                     decoration: const BoxDecoration(
                       color: AppTheme.primary, // Using primary color instead of complex gradient for simplicity, or we can use gradient
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF4F46E5), Color(0xFF9333EA)], // indigo-600 to purple-600
-                      ),
+                      gradient: AppTheme.primaryGradient,
                       borderRadius: BorderRadius.only(
                         topLeft: Radius.circular(24),
                         topRight: Radius.circular(24),
@@ -263,45 +360,62 @@ class HomeScreen extends StatelessWidget {
                               ),
                             ],
                           ),
-                        )
+                        ),
+                        const SizedBox(height: 24),
+                        // Action Button (Moved inside card)
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              final provider = context.read<AppProvider>();
+                              final user = provider.user;
+                              
+                              if (user == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('로그인이 필요한 서비스입니다.')),
+                                );
+                                return;
+                              }
+
+                              final qtLogs = provider.qtLogs;
+                              // Check for today's log
+                              final todayLogIndex = qtLogs.indexWhere((l) => l.date == currentDate && l.userId == user.id);
+                              final todayLog = todayLogIndex != -1 ? qtLogs[todayLogIndex] : null;
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => QTWriteScreen(existingLog: todayLog)),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primary,
+                              padding: const EdgeInsets.symmetric(vertical: 20),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              shadowColor: AppTheme.primary.withOpacity(0.3),
+                              elevation: 8,
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(LucideIcons.penTool, size: 20),
+                                SizedBox(width: 8),
+                                Text('오늘 묵상 기록하기'),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-
-            const SizedBox(height: 24),
-
-            // Action Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  context.read<AppProvider>().setActiveTab(ActiveTab.qt);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  shadowColor: AppTheme.primary.withOpacity(0.3),
-                  elevation: 8,
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(LucideIcons.penTool, size: 20),
-                    SizedBox(width: 8),
-                    Text('오늘 묵상 기록하기'),
-                  ],
-                ),
-              ),
-            ),
           ],
         ),
       ),
+    ),
     );
   }
 }

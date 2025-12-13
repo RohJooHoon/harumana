@@ -20,4 +20,33 @@ class PrayerRequest {
     required this.isAmenedByMe,
     required this.type,
   });
+
+  factory PrayerRequest.fromMap(Map<String, dynamic> data, String id) {
+    return PrayerRequest(
+      id: id,
+      userId: data['userId'] ?? '',
+      userName: data['userName'] ?? '',
+      userAvatar: data['userAvatar'] ?? '',
+      content: data['content'] ?? '',
+      createdAt: data['createdAt'] is int 
+          ? DateTime.fromMillisecondsSinceEpoch(data['createdAt'])
+          : DateTime.tryParse(data['createdAt'].toString()) ?? DateTime.now(),
+      amenCount: data['amenCount'] ?? 0,
+      isAmenedByMe: data['isAmenedByMe'] ?? false,
+      type: data['type'] ?? 'INTERCESSORY',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'userId': userId,
+      'userName': userName,
+      'userAvatar': userAvatar,
+      'content': content,
+      'createdAt': createdAt.millisecondsSinceEpoch,
+      'amenCount': amenCount,
+      'isAmenedByMe': isAmenedByMe,
+      'type': type,
+    };
+  }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/qt_log.dart';
 import '../models/prayer_request.dart';
+import '../models/user.dart';
 import '../data/mock_data.dart';
 
 enum ActiveTab { home, qt, prayer }
@@ -15,8 +16,43 @@ class AppProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  final int _streak = 7;
-  int get streak => _streak;
+  int get streak {
+    if (_user == null) return 0;
+    
+    // Filter my logs
+    final myLogs = _qtLogs.where((l) => l.userId == _user!.id).toList();
+    if (myLogs.isEmpty) return 0;
+    
+    final userDates = myLogs.map((l) => l.date).toSet();
+    DateTime checkDate = DateTime.now();
+    
+    // Check if streak is active (Today or Yesterday present)
+    String dateStr = checkDate.toIso8601String().substring(0, 10);
+    if (!userDates.contains(dateStr)) {
+      // If today not present, check yesterday
+      checkDate = checkDate.subtract(const Duration(days: 1));
+      dateStr = checkDate.toIso8601String().substring(0, 10);
+      if (!userDates.contains(dateStr)) {
+        return 0; // Streak broken
+      }
+    }
+    
+    // Count consecutive days backwards
+    int currentStreak = 0;
+    while (true) {
+      String dStr = checkDate.toIso8601String().substring(0, 10);
+      if (userDates.contains(dStr)) {
+        currentStreak++;
+        checkDate = checkDate.subtract(const Duration(days: 1));
+      } else {
+        break;
+      }
+    }
+    return currentStreak;
+  }
+
+  User? _user = currentUser; // Nullable to represent logged out state
+  User? get user => _user;
 
   // Data State
   final List<QTLog> _qtLogs = List.from(initialQtLogs);
@@ -29,6 +65,14 @@ class AppProvider with ChangeNotifier {
   void addQTLog(QTLog log) {
     _qtLogs.insert(0, log);
     notifyListeners();
+  }
+
+  void updateQTLog(QTLog updatedLog) {
+    final index = _qtLogs.indexWhere((log) => log.id == updatedLog.id);
+    if (index != -1) {
+      _qtLogs[index] = updatedLog;
+      notifyListeners();
+    }
   }
 
   // Prayer Logic
@@ -58,5 +102,16 @@ class AppProvider with ChangeNotifier {
       );
       notifyListeners();
     }
+  }
+
+  // Auth Methods
+  void login() {
+    _user = currentUser;
+    notifyListeners();
+  }
+
+  void logout() {
+    _user = null;
+    notifyListeners();
   }
 }

@@ -2,10 +2,55 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   // Brand Colors
-  static const Color primary = Color(0xFF4F46E5); // indigo-600 (+/-)
-  static const Color secondary = Color(0xFF9333EA); // purple-600
-  static const Color background = Color(0xFFF9FAFB); // gray-50
+  static const int _primaryValue = 0xFF5d708e;
+  static const MaterialColor primary = MaterialColor(
+    _primaryValue,
+    <int, Color>{
+      50: Color(0xFFF5F8FB),
+      100: Color(0xFFE6EEF6),
+      200: Color(0xFFD4E1F0),
+      300: Color(0xFFAFCBE2),
+      400: Color(0xFF81A9D4),
+      500: Color(_primaryValue),
+      600: Color(0xFF455773),
+      700: Color(0xFF39485F),
+      800: Color(0xFF2D384B),
+      900: Color(0xFF1F2736),
+    },
+  );
+
+  static const int _pointValue = 0xFFEDB0B8;
+  static const MaterialColor point = MaterialColor(
+    _pointValue,
+    <int, Color>{
+      50: Color(0xFFFCF6F7),
+      100: Color(0xFFF8E7E9),
+      200: Color(0xFFF4D8DC),
+      300: Color(0xFFF0C9CE),
+      400: Color(0xFFECB9C0),
+      500: Color(_pointValue),
+      600: Color(0xFFD99FA7), 
+      700: Color(0xFFC58E95),
+      800: Color(0xFFB17D84),
+      900: Color(0xFF906066),
+    },
+  );
+
+  static const Color background = Color(0xFFF9FAFB); 
   static const Color surface = Colors.white;
+
+  // Gradients
+  static const LinearGradient primaryGradient = LinearGradient(
+    colors: [primary, Color(0xFF455773)], // primary[600]
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient pointGradient = LinearGradient(
+    colors: [point, Color(0xFFC58E95)], // point[700]
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
   
   // Text Colors
   static const Color textPrimary = Color(0xFF111827); // gray-900
@@ -23,7 +68,7 @@ class AppTheme {
       colorScheme: ColorScheme.fromSeed(
         seedColor: primary,
         primary: primary,
-        secondary: secondary,
+        secondary: const Color(0xFFAFCBE2), // primary[300]
         surface: surface,
         background: background,
         error: error,
