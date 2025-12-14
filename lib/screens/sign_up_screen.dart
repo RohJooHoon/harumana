@@ -9,6 +9,7 @@ import '../data/mock_data.dart'; // To read mockGroups
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
 import '../services/group_service.dart';
+import '../services/notification_service.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -174,17 +175,41 @@ class _SignUpScreenState extends State<SignUpScreen> {
         userName: userName,
       );
 
+      // Check if user is in pending state (needs approval)
+      // If group doesn't allow auto-join, create notification for admin
+      if (!_isAdmin && !_joinGroupLater && _selectedGroupId != null) {
+        final selectedGroup = _availableGroups.firstWhere(
+          (g) => g.id == _selectedGroupId,
+          orElse: () => const Group(id: '', name: '', adminId: ''),
+        );
+
+        if (!selectedGroup.isAutoJoin) {
+          // Create notification for admin about pending approval
+          await NotificationService().createPendingApprovalNotification(
+            groupId: _selectedGroupId!,
+            userId: firebaseUser.uid,
+            userName: _nameController.text,
+          );
+        }
+      }
+
       if (!mounted) return;
 
       // Refresh AppProvider with the new user from Firestore
       await context.read<AppProvider>().refreshCurrentUser();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isAdmin ? '모임이 생성되었습니다!' : '가입이 완료되었습니다!'),
+          content: Text(_isAdmin
+              ? '모임이 생성되었습니다!'
+              : (_joinGroupLater
+                  ? '가입이 완료되었습니다!'
+                  : ((_availableGroups.any((g) => g.id == _selectedGroupId && !g.isAutoJoin))
+                      ? '가입 신청이 완료되었습니다. 관리자 승인을 기다려주세요.'
+                      : '가입이 완료되었습니다!'))),
         ),
       );
-      
+
       Navigator.pop(context);
     } catch (e) {
       setState(() {
@@ -299,7 +324,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     value: _selectedGroupId,
-                    hint: Text('가입할 모임을 선택하세요 (총 ${_availableGroups.length}개)', style: TextStyle(color: _joinGroupLater ? Colors.grey[400] : null)),
+                    hint: Text('가입할 모임을 선택하세요', style: TextStyle(color: _joinGroupLater ? Colors.grey[400] : null)),
                     isExpanded: true,
                     // Use real Available Groups
                     items: _availableGroups.map((g) {

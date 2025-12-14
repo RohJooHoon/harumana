@@ -24,15 +24,26 @@ class PrayerRequest {
   });
 
   factory PrayerRequest.fromMap(Map<String, dynamic> data, String id) {
+    DateTime createdAt;
+    final createdAtValue = data['createdAt'];
+    if (createdAtValue == null) {
+      createdAt = DateTime.now();
+    } else if (createdAtValue is int) {
+      createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtValue);
+    } else if (createdAtValue.runtimeType.toString().contains('Timestamp')) {
+      // Firestore Timestamp
+      createdAt = (createdAtValue as dynamic).toDate();
+    } else {
+      createdAt = DateTime.tryParse(createdAtValue.toString()) ?? DateTime.now();
+    }
+
     return PrayerRequest(
       id: id,
       userId: data['userId'] ?? '',
       userName: data['userName'] ?? '',
       userAvatar: data['userAvatar'] ?? '',
       content: data['content'] ?? '',
-      createdAt: data['createdAt'] is int 
-          ? DateTime.fromMillisecondsSinceEpoch(data['createdAt'])
-          : DateTime.tryParse(data['createdAt'].toString()) ?? DateTime.now(),
+      createdAt: createdAt,
       amenCount: data['amenCount'] ?? 0,
       isAmenedByMe: data['isAmenedByMe'] ?? false,
       type: data['type'] ?? 'INTERCESSORY',

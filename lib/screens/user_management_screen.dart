@@ -6,6 +6,7 @@ import '../models/user.dart';
 import '../providers/app_provider.dart';
 import '../services/user_management_service.dart';
 import '../services/user_service.dart'; // For removing user (update groupId)
+import '../services/notification_service.dart';
 
 class UserManagementScreen extends StatefulWidget {
   const UserManagementScreen({super.key});
@@ -32,6 +33,18 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
   Future<void> _approveUser(String userId, String groupId) async {
     try {
       await UserManagementService.approveUser(userId, groupId);
+
+      // Get group name for notification
+      final group = context.read<AppProvider>().currentGroup;
+      final groupName = group?.name ?? '모임';
+
+      // Create notification for user about approval
+      await NotificationService().createApprovalGrantedNotification(
+        userId: userId,
+        groupId: groupId,
+        groupName: groupName,
+      );
+
       setState(() {}); // Refresh UI
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('가입이 승인되었습니다.')));
     } catch (e) {

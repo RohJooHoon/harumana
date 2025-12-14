@@ -144,8 +144,33 @@ class UserService {
     await _usersCollection.doc(uid).delete();
   }
 
-  /// Update User Group ID
+  /// Update User Group ID (direct assignment)
   static Future<void> updateUserGroup(String uid, String groupId) async {
-    await _usersCollection.doc(uid).update({'groupId': groupId});
+    await _usersCollection.doc(uid).update({
+      'groupId': groupId,
+      'pendingGroupId': FieldValue.delete(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Set pending group (for groups that require approval)
+  static Future<void> setPendingGroup(String uid, String groupId) async {
+    await _usersCollection.doc(uid).update({
+      'groupId': FieldValue.delete(),
+      'pendingGroupId': groupId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Clear user's group (become individual user without group)
+  static Future<void> clearUserGroup(String uid) async {
+    await _usersCollection.doc(uid).update({
+      'groupId': FieldValue.delete(),
+      'groupName': FieldValue.delete(),
+      'pendingGroupId': FieldValue.delete(),
+      'adminName': FieldValue.delete(),
+      'userName': FieldValue.delete(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 }

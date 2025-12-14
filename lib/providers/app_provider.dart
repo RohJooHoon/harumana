@@ -11,6 +11,7 @@ import '../services/auth_service.dart';
 import '../services/user_service.dart';
 import '../services/group_service.dart';
 import '../services/prayer_service.dart';
+import '../services/notification_service.dart';
 
 enum ActiveTab { home, qt, prayer, settings }
 
@@ -39,6 +40,11 @@ class AppProvider with ChangeNotifier {
   
   Group? _currentGroup;
   Group? get currentGroup => _currentGroup;
+
+  // 가입 대기 상태 확인
+  bool get isPendingGroupApproval => _user?.pendingGroupId != null && _user?.groupId == null;
+  bool get hasNoGroup => _user?.groupId == null && _user?.pendingGroupId == null;
+  bool get hasGroup => _user?.groupId != null;
 
   AppProvider() {
     _initializeAuth();
@@ -81,6 +87,9 @@ class AppProvider with ChangeNotifier {
         _user = firestoreUser;
         await _initializeGroup(); // Now async
         _currentMode = firestoreUser.role; // Start in assigned role mode
+
+        // Save FCM token for push notifications
+        await NotificationService().saveTokenToUser(uid);
       } else {
         // User exists in Auth but not in Firestore
         // This can happen if Firestore write failed during signup
@@ -102,21 +111,30 @@ class AppProvider with ChangeNotifier {
   }
 
   Future<void> _initializeGroup() async {
+    debugPrint('[_initializeGroup] user: $_user, groupId: ${_user?.groupId}');
+
     if (_user?.groupId != null) {
       try {
+        debugPrint('[_initializeGroup] Loading group: ${_user!.groupId}');
         final group = await GroupService.getGroup(_user!.groupId!);
+        debugPrint('[_initializeGroup] Loaded group: $group');
+
         if (group != null) {
           _currentGroup = group;
+          debugPrint('[_initializeGroup] currentGroup set: ${_currentGroup?.name}');
+        } else {
+          debugPrint('[_initializeGroup] Group not found in Firestore!');
         }
 
         if (_currentGroup != null) {
           await _loadPrayers();
         }
       } catch (e) {
-        debugPrint('Error loading group: $e');
+        debugPrint('[_initializeGroup] Error loading group: $e');
         _currentGroup = null;
       }
     } else {
+      debugPrint('[_initializeGroup] No groupId on user, skipping group load');
       _currentGroup = null;
     }
   }
@@ -222,19 +240,26 @@ class AppProvider with ChangeNotifier {
   }
 
   Future<void> addPrayerRequest(PrayerRequest request) async {
-    if (_currentGroup == null) return;
-    
+    debugPrint('[addPrayerRequest] currentGroup: $_currentGroup, user: $_user, groupId: ${_user?.groupId}');
+
+    if (_currentGroup == null) {
+      debugPrint('[addPrayerRequest] currentGroup is null! Cannot add prayer.');
+      throw '그룹에 속해있지 않습니다. 먼저 그룹에 가입해주세요.';
+    }
+
     try {
+      debugPrint('[addPrayerRequest] Saving to Firestore... groupId: ${_currentGroup!.id}');
       // Save to Firestore
       await PrayerService.addPrayer(_currentGroup!.id, request);
-      
+      debugPrint('[addPrayerRequest] Saved successfully!');
+
       // Update local state (Optimistic or wait for Stream? For now, manual add)
       // Note: If we implement Stream later, this might duplicate.
       // But user requested "insert into groups data", so Firestore is priority.
-      _prayerRequests.insert(0, request); 
+      _prayerRequests.insert(0, request);
       notifyListeners();
     } catch (e) {
-      print('Error adding prayer: $e');
+      debugPrint('[addPrayerRequest] Error: $e');
       rethrow;
     }
   }
@@ -274,6 +299,11 @@ class AppProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Remove FCM token before logout
+    if (_user != null) {
+      await NotificationService().removeTokenFromUser(_user!.id);
+    }
+
     await AuthService.signOut();
     _user = null;
     _currentGroup = null;
@@ -333,6 +363,125 @@ class AppProvider with ChangeNotifier {
         debugPrint('Error updating user avatar: $e');
         rethrow;
       }
+    }
+  }
+
+  /// Update user's group (change to a different group)
+  /// Returns true if directly joined, false if pending approval
+  Future<bool> updateUserGroupId(String newGroupId) async {
+    if (_user == null) return false;
+
+    try {
+      // Load the new group info to check isAutoJoin
+      final newGroup = await GroupService.getGroup(newGroupId);
+      if (newGroup == null) {
+        throw '그룹을 찾을 수 없습니다.';
+      }
+
+      // 이미 인증되지 않은 상태(pendingGroupId가 있고 groupId가 없음)인 경우,
+      // 새 그룹도 무조건 pending 상태로 설정 (isAutoJoin 여부 무관)
+      final bool isCurrentlyPending = _user!.pendingGroupId != null && _user!.groupId == null;
+
+      // Check if group allows auto-join (only for currently approved users)
+      if (newGroup.isAutoJoin && !isCurrentlyPending) {
+        // Direct join - update groupId (only if user was already approved)
+        await UserService.updateUserGroup(_user!.id, newGroupId);
+
+        _user = User(
+          id: _user!.id,
+          email: _user!.email,
+          name: _user!.name,
+          avatarUrl: _user!.avatarUrl,
+          role: _user!.role,
+          groupId: newGroupId,
+          groupName: newGroup.name,
+          adminName: _user!.adminName,
+          userName: _user!.userName,
+          deviceId: _user!.deviceId,
+          createdAt: _user!.createdAt,
+          pendingGroupId: null,
+        );
+
+        _currentGroup = newGroup;
+
+        // Reload prayers for the new group
+        await _loadPrayers();
+
+        notifyListeners();
+        return true;
+      } else {
+        // Requires approval - set pendingGroupId
+        // (either group doesn't allow auto-join OR user is currently pending)
+        await UserService.setPendingGroup(_user!.id, newGroupId);
+
+        // Send notification to admin
+        await NotificationService().createPendingApprovalNotification(
+          groupId: newGroupId,
+          userId: _user!.id,
+          userName: _user!.name,
+        );
+
+        _user = User(
+          id: _user!.id,
+          email: _user!.email,
+          name: _user!.name,
+          avatarUrl: _user!.avatarUrl,
+          role: _user!.role,
+          groupId: null,
+          groupName: null,
+          adminName: _user!.adminName,
+          userName: _user!.userName,
+          deviceId: _user!.deviceId,
+          createdAt: _user!.createdAt,
+          pendingGroupId: newGroupId,
+        );
+
+        _currentGroup = null;
+        _prayerRequests.clear();
+
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Error updating user group: $e');
+      rethrow;
+    }
+  }
+
+  /// Get all available groups
+  Future<List<Group>> getAllGroups() async {
+    return await GroupService.getAllGroups();
+  }
+
+  /// Clear user's group (become individual user without group)
+  Future<void> clearUserGroup() async {
+    if (_user == null) return;
+
+    try {
+      await UserService.clearUserGroup(_user!.id);
+
+      _user = User(
+        id: _user!.id,
+        email: _user!.email,
+        name: _user!.name,
+        avatarUrl: _user!.avatarUrl,
+        role: _user!.role,
+        groupId: null,
+        groupName: null,
+        adminName: null,
+        userName: null,
+        deviceId: _user!.deviceId,
+        createdAt: _user!.createdAt,
+        pendingGroupId: null,
+      );
+
+      _currentGroup = null;
+      _prayerRequests.clear();
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error clearing user group: $e');
+      rethrow;
     }
   }
 }

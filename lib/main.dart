@@ -4,7 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
 import 'providers/app_provider.dart';
-import 'screens/home_screen.dart'; 
+import 'screens/home_screen.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,13 +19,16 @@ void main() async {
       iosBundleId: "com.jho2.harumanna",
     ),
   );
-  
+
   // Disable persistence to avoid 'unavailable' issues on simulator
   FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: false);
-  
+
   // Also disable for specific database 'harumanna'
   FirebaseFirestore.instanceFor(app: Firebase.app(), databaseId: 'harumanna').settings = const Settings(persistenceEnabled: false);
-  
+
+  // Initialize notification service
+  await NotificationService().initialize();
+
   runApp(const MyApp());
 }
 

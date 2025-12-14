@@ -4,9 +4,8 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../models/prayer_request.dart';
 import '../providers/app_provider.dart';
-import '../models/user.dart';
-import '../data/mock_data.dart'; // for current user
 import '../theme/app_theme.dart';
+import 'my_info_screen.dart';
 
 class PrayerScreen extends StatefulWidget {
   const PrayerScreen({super.key});
@@ -32,7 +31,28 @@ class _PrayerScreenState extends State<PrayerScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     // Check Admin Mode
-    final isAdmin = context.watch<AppProvider>().isAdminMode;
+    final provider = context.watch<AppProvider>();
+    final isAdmin = provider.isAdminMode;
+    final currentUser = provider.user;
+
+    // 그룹이 없거나 가입 대기 상태일 때 차단
+    if (provider.isPendingGroupApproval) {
+      return _buildBlockedScreen(
+        icon: LucideIcons.clock,
+        title: '가입 승인 대기 중',
+        message: '모임 관리자의 승인을 기다리고 있습니다.\n승인이 완료되면 기도 기능을 이용하실 수 있습니다.',
+        isAdmin: isAdmin,
+      );
+    }
+
+    if (provider.hasNoGroup) {
+      return _buildBlockedScreen(
+        icon: LucideIcons.users,
+        title: '모임에 가입해주세요',
+        message: '기도 기능을 이용하려면 모임에 가입해야 합니다.\n프로필 > 내 정보 수정에서 모임을 선택해주세요.',
+        isAdmin: isAdmin,
+      );
+    }
 
     // Auto-switch tab if mismatched mode (e.g. freshly switched to Admin)
     if (isAdmin && (_activeTab == 'INTERCESSORY' || _activeTab == 'ONE_ON_ONE')) {
@@ -50,10 +70,10 @@ class _PrayerScreenState extends State<PrayerScreen> with SingleTickerProviderSt
     }
 
     // Calculate Start of Week (Monday)
-    final requests = context.watch<AppProvider>().prayerRequests;
+    final requests = provider.prayerRequests;
     final now = DateTime.now();
     final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
-    
+
     final filteredRequests = requests.where((r) {
       if (isAdmin) {
         // Admin View: Only ONE_ON_ONE
@@ -68,11 +88,11 @@ class _PrayerScreenState extends State<PrayerScreen> with SingleTickerProviderSt
       } else {
         // User View
         if (r.type != _activeTab) return false;
-        
+
         if (r.type == 'INTERCESSORY') {
            return r.createdAt.isAfter(startOfWeek);
         } else {
-           return r.userId == currentUser.id;
+           return r.userId == currentUser?.id;
         }
       }
     }).toList();
@@ -229,6 +249,88 @@ class _PrayerScreenState extends State<PrayerScreen> with SingleTickerProviderSt
     );
   }
 
+  Widget _buildBlockedScreen({
+    required IconData icon,
+    required String title,
+    required String message,
+    required bool isAdmin,
+  }) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: isAdmin
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(LucideIcons.menu, color: Colors.black),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+              title: const Text('기도 관리',
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.white,
+              elevation: 0,
+            )
+          : null,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, size: 40, color: Colors.grey[400]),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MyInfoScreen()),
+                    );
+                  },
+                  icon: const Icon(LucideIcons.settings, size: 18),
+                  label: const Text('내 정보 수정'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.primary,
+                    side: BorderSide(color: AppTheme.primary),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 
 }
 
@@ -370,11 +472,20 @@ class _WriteIntercessoryPrayerScreenState extends State<WriteIntercessoryPrayerS
   Future<void> _handleSubmit() async {
     if (_contentController.text.isEmpty) return;
 
+    final provider = context.read<AppProvider>();
+    final user = provider.user;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('로그인이 필요합니다.')),
+      );
+      return;
+    }
+
     final newRequest = PrayerRequest(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      userId: currentUser.id,
-      userName: currentUser.name,
-      userAvatar: currentUser.avatarUrl,
+      userId: user.id,
+      userName: user.name,
+      userAvatar: user.avatarUrl,
       content: _contentController.text,
       createdAt: DateTime.now(),
       amenCount: 0,
@@ -383,7 +494,7 @@ class _WriteIntercessoryPrayerScreenState extends State<WriteIntercessoryPrayerS
     );
 
     try {
-      await context.read<AppProvider>().addPrayerRequest(newRequest);
+      await provider.addPrayerRequest(newRequest);
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
@@ -471,11 +582,20 @@ class _WriteOneOnOnePrayerScreenState extends State<WriteOneOnOnePrayerScreen> {
   Future<void> _handleSubmit() async {
     if (_contentController.text.isEmpty) return;
 
+    final provider = context.read<AppProvider>();
+    final user = provider.user;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('로그인이 필요합니다.')),
+      );
+      return;
+    }
+
     final newRequest = PrayerRequest(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      userId: currentUser.id,
-      userName: currentUser.name,
-      userAvatar: currentUser.avatarUrl,
+      userId: user.id,
+      userName: user.name,
+      userAvatar: user.avatarUrl,
       content: _contentController.text,
       createdAt: DateTime.now(),
       amenCount: 0,
@@ -484,7 +604,7 @@ class _WriteOneOnOnePrayerScreenState extends State<WriteOneOnOnePrayerScreen> {
     );
 
     try {
-      await context.read<AppProvider>().addPrayerRequest(newRequest);
+      await provider.addPrayerRequest(newRequest);
       if (mounted) Navigator.pop(context);
     } catch (e) {
        if (mounted) {

@@ -440,9 +440,52 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildUserHome(BuildContext context, User? user, dynamic word, int streak) {
+    final provider = context.watch<AppProvider>();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 가입 대기 상태 배너
+        if (provider.isPendingGroupApproval)
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.orange[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.orange[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(LucideIcons.clock, color: Colors.orange[700], size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '가입 승인 대기 중',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange[800],
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '모임 관리자의 승인을 기다리고 있습니다',
+                        style: TextStyle(
+                          color: Colors.orange[700],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
         // Header: User & Streak
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
