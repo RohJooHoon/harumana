@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
+import '../services/group_service.dart';
 
 class UserService {
   // Use specific database 'harumanna'
@@ -31,17 +32,36 @@ class UserService {
 
     final String authType = role.toAuthString; // SUPER, ADMIN, USER
 
+    // Determine Group ID and Pending Group ID based on AutoJoin
+    String? finalGroupId = groupId;
+    String? pendingGroupId;
+
+    if (groupId != null) {
+      // Allow Admins/SuperAdmins to join immediately regardless of AutoJoin setting
+      if (role == UserRole.admin || role == UserRole.superAdmin) {
+        // Keep finalGroupId as is
+      } else {
+        final group = await GroupService.getGroup(groupId);
+        if (group != null && !group.isAutoJoin) {
+          // If not auto-join, set pending logic
+          finalGroupId = null;
+          pendingGroupId = groupId;
+        }
+      }
+    }
+
     await _usersCollection.doc(uid).set({
       'email': email,
       'displayName': name, // name -> displayName
       'photoURL': photoUrl, // null if not provided
       'auth': authType,    // role -> auth
       
-      'groupId': groupId,
+      'groupId': finalGroupId,
       'groupName': groupName,
       'adminName': adminName, // 호칭 (관리자용)
       'userName': userName,   // 호칭 (사용자용)
-      
+      'pendingGroupId': pendingGroupId,
+
       'deviceId': deviceId,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -122,5 +142,10 @@ class UserService {
   /// Delete User (Firestore Document only - Auth deletion requires separate Admin SDK or Cloud Function in real production)
   static Future<void> deleteUser(String uid) async {
     await _usersCollection.doc(uid).delete();
+  }
+
+  /// Update User Group ID
+  static Future<void> updateUserGroup(String uid, String groupId) async {
+    await _usersCollection.doc(uid).update({'groupId': groupId});
   }
 }

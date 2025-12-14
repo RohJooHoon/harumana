@@ -10,11 +10,11 @@ final String currentDate = DateTime.now().toIso8601String().substring(0, 10);
 final List<Group> mockGroups = [
   const Group(
     id: 'g1',
-    name: '사랑의교회 청년부',
+    name: '하루만나교회',
     adminId: 'u1',
     isAutoJoin: false,
     adminTitle: '목사님',
-    userTitle: '청년',
+    userTitle: '성도님',
   ),
   const Group(
     id: 'g2',

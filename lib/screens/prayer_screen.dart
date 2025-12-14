@@ -132,7 +132,25 @@ class _PrayerScreenState extends State<PrayerScreen> with SingleTickerProviderSt
             
             // List
             Expanded(
-              child: ListView.separated(
+              child: filteredRequests.isEmpty 
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(LucideIcons.clipboardList, size: 48, color: Colors.grey[300]),
+                      const SizedBox(height: 16),
+                      Text(
+                        '아직 등록된 기도제목이 없습니다',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                 itemCount: filteredRequests.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -349,7 +367,7 @@ class _WriteIntercessoryPrayerScreenState extends State<WriteIntercessoryPrayerS
   final _contentController = TextEditingController();
   bool _isRefining = false;
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     if (_contentController.text.isEmpty) return;
 
     final newRequest = PrayerRequest(
@@ -364,8 +382,14 @@ class _WriteIntercessoryPrayerScreenState extends State<WriteIntercessoryPrayerS
       type: 'INTERCESSORY',
     );
 
-    context.read<AppProvider>().addPrayerRequest(newRequest);
-    Navigator.pop(context);
+    try {
+      await context.read<AppProvider>().addPrayerRequest(newRequest);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('저장 실패: $e')));
+      }
+    }
   }
 
   @override
@@ -444,7 +468,7 @@ class _WriteOneOnOnePrayerScreenState extends State<WriteOneOnOnePrayerScreen> {
   final _contentController = TextEditingController();
   bool _isRefining = false;
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     if (_contentController.text.isEmpty) return;
 
     final newRequest = PrayerRequest(
@@ -459,8 +483,14 @@ class _WriteOneOnOnePrayerScreenState extends State<WriteOneOnOnePrayerScreen> {
       type: 'ONE_ON_ONE',
     );
 
-    context.read<AppProvider>().addPrayerRequest(newRequest);
-    Navigator.pop(context);
+    try {
+      await context.read<AppProvider>().addPrayerRequest(newRequest);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('저장 실패: $e')));
+      }
+    }
   }
 
   @override

@@ -40,6 +40,7 @@ class User {
   final String? userName;  // 호칭 (예: 성도님)
   final String? deviceId;
   final DateTime? createdAt;
+  final String? pendingGroupId;
 
   const User({
     required this.id,
@@ -54,6 +55,7 @@ class User {
     this.userName,
     this.deviceId,
     this.createdAt,
+    this.pendingGroupId,
   }) : photoUrl = photoUrl ?? avatarUrl; // initialize photoUrl with avatarUrl if photoUrl is null
 
   factory User.fromMap(Map<String, dynamic> data, String elementId) {
@@ -81,6 +83,7 @@ class User {
       userName: data['userName'],
       deviceId: data['deviceId'],
       createdAt: created,
+      pendingGroupId: data['pendingGroupId'],
     );
   }
 
@@ -96,6 +99,7 @@ class User {
       'userName': userName,
       'deviceId': deviceId,
       'createdAt': createdAt ?? DateTime.now(), // Usually set by ServerTimestamp
+      'pendingGroupId': pendingGroupId,
     };
   }
 

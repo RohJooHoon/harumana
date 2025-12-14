@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
@@ -9,6 +10,7 @@ import '../data/mock_data.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
 import '../services/group_service.dart';
+import '../services/prayer_service.dart';
 
 enum ActiveTab { home, qt, prayer, settings }
 
@@ -105,10 +107,10 @@ class AppProvider with ChangeNotifier {
         final group = await GroupService.getGroup(_user!.groupId!);
         if (group != null) {
           _currentGroup = group;
-        } else {
-          // Group ID exists but validation failed (deleted?)
-          // Fallback to mock or handle error
-           _currentGroup = mockGroups.isNotEmpty ? mockGroups[0] : null;
+        }
+
+        if (_currentGroup != null) {
+          await _loadPrayers();
         }
       } catch (e) {
         debugPrint('Error loading group: $e');
@@ -189,7 +191,7 @@ class AppProvider with ChangeNotifier {
   final List<QTLog> _qtLogs = List.from(initialQtLogs);
   List<QTLog> get qtLogs => _qtLogs;
 
-  final List<PrayerRequest> _prayerRequests = List.from(initialPrayerRequests);
+  final List<PrayerRequest> _prayerRequests = [];
   List<PrayerRequest> get prayerRequests => _prayerRequests;
 
   // QT Logic
@@ -207,9 +209,34 @@ class AppProvider with ChangeNotifier {
   }
 
   // Prayer Logic
-  void addPrayerRequest(PrayerRequest request) {
-    _prayerRequests.insert(0, request);
-    notifyListeners();
+  Future<void> _loadPrayers() async {
+    if (_currentGroup == null) return;
+    try {
+      final prayers = await PrayerService.getPrayers(_currentGroup!.id);
+      _prayerRequests.clear();
+      _prayerRequests.addAll(prayers);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading prayers: $e');
+    }
+  }
+
+  Future<void> addPrayerRequest(PrayerRequest request) async {
+    if (_currentGroup == null) return;
+    
+    try {
+      // Save to Firestore
+      await PrayerService.addPrayer(_currentGroup!.id, request);
+      
+      // Update local state (Optimistic or wait for Stream? For now, manual add)
+      // Note: If we implement Stream later, this might duplicate.
+      // But user requested "insert into groups data", so Firestore is priority.
+      _prayerRequests.insert(0, request); 
+      notifyListeners();
+    } catch (e) {
+      print('Error adding prayer: $e');
+      rethrow;
+    }
   }
 
   void toggleAmen(String id) {
@@ -267,6 +294,12 @@ class AppProvider with ChangeNotifier {
           avatarUrl: _user!.avatarUrl,
           role: _user!.role,
           groupId: _user!.groupId,
+          groupName: _user!.groupName,
+          adminName: _user!.adminName,
+          userName: _user!.userName,
+          deviceId: _user!.deviceId,
+          createdAt: _user!.createdAt,
+          pendingGroupId: _user!.pendingGroupId,
         );
         notifyListeners();
       } catch (e) {
@@ -288,6 +321,12 @@ class AppProvider with ChangeNotifier {
           avatarUrl: avatarUrl,
           role: _user!.role,
           groupId: _user!.groupId,
+          groupName: _user!.groupName,
+          adminName: _user!.adminName,
+          userName: _user!.userName,
+          deviceId: _user!.deviceId,
+          createdAt: _user!.createdAt,
+          pendingGroupId: _user!.pendingGroupId,
         );
         notifyListeners();
       } catch (e) {
