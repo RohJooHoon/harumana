@@ -2,14 +2,35 @@ import '../models/user.dart';
 import '../models/daily_word.dart';
 import '../models/qt_log.dart';
 import '../models/prayer_request.dart';
+import '../models/group.dart';
 
 final String currentDate = DateTime.now().toIso8601String().substring(0, 10);
+
+// Mock Groups
+final List<Group> mockGroups = [
+  const Group(
+    id: 'g1',
+    name: '사랑의교회 청년부',
+    adminId: 'u1',
+    isAutoJoin: false,
+    adminTitle: '목사님',
+    userTitle: '청년',
+  ),
+  const Group(
+    id: 'g2',
+    name: '테스트 목장',
+    adminId: 'u99',
+    isAutoJoin: true,
+  ),
+];
 
 const User currentUser = User(
   id: 'u1',
   email: 'jimin@example.com',
   name: '지민',
   avatarUrl: 'https://picsum.photos/id/64/200/200',
+  role: UserRole.superAdmin, // Default to SuperAdmin for testing
+  groupId: 'g1',
 );
 
 final DailyWord todaysWord = DailyWord(
@@ -111,7 +132,7 @@ List<PrayerRequest> initialPrayerRequests = [
     content: '가정 내에 작은 불화가 있습니다. 남편과의 대화가 자꾸 어긋나는데, 제가 먼저 낮아지고 섬길 수 있는 마음을 달라고 기도해주셨으면 합니다.',
     createdAt: DateTime.now().subtract(const Duration(days: 4)),
     amenCount: 1, // Pastor clicked Amen
-    isAmenedByMe: false,
+    isAmenedByMe: true, // 관리자가 아멘한 상태 - 완료된 기도로 분류
     type: 'ONE_ON_ONE',
   ),
 ];

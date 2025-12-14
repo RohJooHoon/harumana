@@ -8,6 +8,7 @@ class PrayerRequest {
   int amenCount;
   bool isAmenedByMe;
   final String type; // 'INTERCESSORY' | 'ONE_ON_ONE'
+  bool isRead; // Critical for Admin 1:1 workflow (New/Read state)
 
   PrayerRequest({
     required this.id,
@@ -19,6 +20,7 @@ class PrayerRequest {
     required this.amenCount,
     required this.isAmenedByMe,
     required this.type,
+    this.isRead = false,
   });
 
   factory PrayerRequest.fromMap(Map<String, dynamic> data, String id) {
@@ -34,6 +36,7 @@ class PrayerRequest {
       amenCount: data['amenCount'] ?? 0,
       isAmenedByMe: data['isAmenedByMe'] ?? false,
       type: data['type'] ?? 'INTERCESSORY',
+      isRead: data['isRead'] ?? false,
     );
   }
 
@@ -47,6 +50,7 @@ class PrayerRequest {
       'amenCount': amenCount,
       'isAmenedByMe': isAmenedByMe,
       'type': type,
+      'isRead': isRead,
     };
   }
 }

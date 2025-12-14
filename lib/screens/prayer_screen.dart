@@ -16,47 +16,85 @@ class PrayerScreen extends StatefulWidget {
 }
 
 class _PrayerScreenState extends State<PrayerScreen> with SingleTickerProviderStateMixin {
-  String _activeTab = 'INTERCESSORY'; // 'INTERCESSORY' | 'ONE_ON_ONE'
+  // Tabs:
+  // User: 'INTERCESSORY', 'ONE_ON_ONE'
+  // Admin: 'ADMIN_NEW', 'ADMIN_COMPLETED' (Both are 1:1 type)
+  String _activeTab = 'INTERCESSORY'; 
+
+  @override
+  void initState() {
+    super.initState();
+    // Defer admin check to build or use post-frame callback if needed, 
+    // but here we can just default to INTERCESSORY and switch in build if needed, 
+    // or better, handle it dynamically.
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Check Admin Mode
+    final isAdmin = context.watch<AppProvider>().isAdminMode;
+
+    // Auto-switch tab if mismatched mode (e.g. freshly switched to Admin)
+    if (isAdmin && (_activeTab == 'INTERCESSORY' || _activeTab == 'ONE_ON_ONE')) {
+       // Using simpler logic: If in Admin mode, treat standard keys as invalid or auto-map?
+       // Let's force update logic implicitly by rendering correct tabs, but we need state to match.
+       // Better: Just maintain valid state.
+       // If currently using User tabs, switch to Admin default.
+       WidgetsBinding.instance.addPostFrameCallback((_) {
+         setState(() => _activeTab = 'ADMIN_NEW');
+       });
+    } else if (!isAdmin && (_activeTab == 'ADMIN_NEW' || _activeTab == 'ADMIN_COMPLETED')) {
+       WidgetsBinding.instance.addPostFrameCallback((_) {
+         setState(() => _activeTab = 'INTERCESSORY');
+       });
+    }
+
     // Calculate Start of Week (Monday)
     final requests = context.watch<AppProvider>().prayerRequests;
     final now = DateTime.now();
-    // Monday = 1, Sunday = 7. Subtract (weekday - 1) days to get Monday.
     final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
     
     final filteredRequests = requests.where((r) {
-      if (r.type != _activeTab) return false;
-      // Filter for this week (only if Intercessory? User said "Intercessory is weekly", but let's apply to all for now or just Intercessory based on tab)
-      // "Intercessory is for this week" - implying 1:1 might not be restricted? 
-      // User query: "Intercessory... weekly reset". I will apply to Intercessory mainly, but usually feed logic applies to tab. 
-      // Let's safe bet apply to Intercessory only if tab is Intercessory, or both. 
-      // "Intercessory is this week...". 1:1 is usually private history.
-      // I'll apply logic to Intercessory tab specifically or both if unspecified. 
-      // "Intercessory is weekly reset".
-      if (r.type == 'INTERCESSORY') {
-        return r.createdAt.isAfter(startOfWeek);
+      if (isAdmin) {
+        // Admin View: Only ONE_ON_ONE
+        if (r.type != 'ONE_ON_ONE') return false;
+
+        if (_activeTab == 'ADMIN_NEW') {
+          return !r.isAmenedByMe;
+        } else if (_activeTab == 'ADMIN_COMPLETED') {
+          return r.isAmenedByMe;
+        }
+        return false; // Should not reach here if tab logic is sound
+      } else {
+        // User View
+        if (r.type != _activeTab) return false;
+        
+        if (r.type == 'INTERCESSORY') {
+           return r.createdAt.isAfter(startOfWeek);
+        } else {
+           return r.userId == currentUser.id;
+        }
       }
-      return true; // Keep 1:1 as is? Or filter too? "Each prayer date..."
-      // I'll filter Intercessory only based on request phrasing. But actually "This week's intercessory".
-      // Let's filter only 'INTERCESSORY' types by date.
     }).toList();
 
-    // Sorting: My posts first, then Chronological (Newest first)
+    // Sorting
     filteredRequests.sort((a, b) {
-      final aIsMine = a.userId == currentUser.id;
-      final bIsMine = b.userId == currentUser.id;
-
-      if (aIsMine && !bIsMine) return -1;
-      if (!aIsMine && bIsMine) return 1;
-      
-      // Secondary: Time order (Newest first)
-      return b.createdAt.compareTo(a.createdAt);
+       // Admin New/Completed are typically chronological based on creation?
+       // Newest first.
+       return b.createdAt.compareTo(a.createdAt);
     });
 
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: isAdmin ? AppBar(
+        leading: IconButton(
+          icon: const Icon(LucideIcons.menu, color: Colors.black),
+          onPressed: () => Scaffold.of(context).openDrawer(),
+        ),
+        title: const Text('기도 관리', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+      ) : null,
       body: SafeArea(
         child: Column(
           children: [
@@ -66,8 +104,10 @@ class _PrayerScreenState extends State<PrayerScreen> with SingleTickerProviderSt
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                   const Text('기도', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                   const SizedBox(height: 16),
+                   if (!isAdmin) ...[
+                     const Text('기도', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                     const SizedBox(height: 16),
+                   ],
                    Container(
                      padding: const EdgeInsets.all(4),
                      decoration: BoxDecoration(
@@ -75,10 +115,15 @@ class _PrayerScreenState extends State<PrayerScreen> with SingleTickerProviderSt
                        borderRadius: BorderRadius.circular(100),
                      ),
                      child: Row(
-                       children: [
-                         _buildTab('이번주 중보기도', 'INTERCESSORY'), // Updated Label hint
-                         _buildTab('1:1 기도요청', 'ONE_ON_ONE'),
-                       ],
+                       children: isAdmin 
+                        ? [
+                           _buildTab('신규 기도 요청', 'ADMIN_NEW'),
+                           _buildTab('완료된 기도', 'ADMIN_COMPLETED'),
+                          ]
+                        : [
+                           _buildTab('이번주 중보기도', 'INTERCESSORY'),
+                           _buildTab('1:1 기도요청', 'ONE_ON_ONE'),
+                          ],
                      ),
                    ),
                 ],
@@ -98,7 +143,8 @@ class _PrayerScreenState extends State<PrayerScreen> with SingleTickerProviderSt
               ),
             ),
 
-            // Bottom Action Button
+            // Bottom Action Button (Hidden for Admin)
+            if (!isAdmin)
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -164,6 +210,8 @@ class _PrayerScreenState extends State<PrayerScreen> with SingleTickerProviderSt
       ),
     );
   }
+
+
 }
 
 class _PrayerCard extends StatefulWidget {
@@ -180,6 +228,9 @@ class _PrayerCardState extends State<_PrayerCard> {
 
   @override
   Widget build(BuildContext context) {
+    // Access provider for admin check
+    final isAdmin = context.watch<AppProvider>().isAdminMode;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -231,20 +282,29 @@ class _PrayerCardState extends State<_PrayerCard> {
             ),
           ),
           const SizedBox(height: 16),
-          if (widget.request.type == 'INTERCESSORY' || (widget.request.type == 'ONE_ON_ONE' && widget.request.amenCount > 0))
+          
+          // Conditions to show Amen Button:
+          // 1. Intercessory: Always show
+          // 2. 1:1: Show if I am Admin OR if it has been amened (by admin)
+          if (widget.request.type == 'INTERCESSORY' || (widget.request.type == 'ONE_ON_ONE' && (widget.request.amenCount > 0 || isAdmin)))
           GestureDetector(
-            onTap: widget.request.type == 'INTERCESSORY' 
+            // Enable interaction if Intercessory OR (1:1 and Admin)
+            onTap: (widget.request.type == 'INTERCESSORY' || (widget.request.type == 'ONE_ON_ONE' && isAdmin))
               ? () {
                   context.read<AppProvider>().toggleAmen(widget.request.id);
                 }
-              : null, // Read-only for 1:1
+              : null, 
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
+                // Color Logic:
+                // 1. One-on-One that IS amened (count > 0): Special Point Color (Pastor Checked)
+                // 2. My Amen (Intercessory): Primary Color
+                // 3. Default: Grey
                 color: (widget.request.type == 'ONE_ON_ONE' && widget.request.amenCount > 0)
-                  ? AppTheme.point[200] // Pastor Checked: Point Color
-                  : (widget.request.isAmenedByMe ? AppTheme.primary[200] : Colors.grey[50]),
+                  ? AppTheme.point[200]!
+                  : (widget.request.isAmenedByMe ? AppTheme.primary[200]! : Colors.grey[50]),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
@@ -405,6 +465,11 @@ class _WriteOneOnOnePrayerScreenState extends State<WriteOneOnOnePrayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Get dynamic admin title
+    final provider = context.watch<AppProvider>();
+    final group = provider.currentGroup;
+    final adminTitle = group?.adminTitle ?? '목사님';
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -414,7 +479,7 @@ class _WriteOneOnOnePrayerScreenState extends State<WriteOneOnOnePrayerScreen> {
         ),
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text('1:1 기도 요청', style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold)),
+        title: Text('$adminTitle께 1:1 기도 요청', style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: Column(
@@ -432,7 +497,7 @@ class _WriteOneOnOnePrayerScreenState extends State<WriteOneOnOnePrayerScreen> {
                      expands: true,
                      textAlignVertical: TextAlignVertical.top,
                      decoration: InputDecoration(
-                       hintText: '목사님 or 목회장님께 요청드릴 개인 기도를 적어주세요',
+                       hintText: '$adminTitle께 요청드릴 개인 기도를 적어주세요',
                        hintStyle: TextStyle(color: Colors.grey[400]),
                        filled: true,
                        fillColor: Colors.grey[50],

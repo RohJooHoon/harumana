@@ -7,6 +7,7 @@ import '../models/daily_word.dart';
 import '../providers/app_provider.dart';
 import '../data/mock_data.dart';
 import '../theme/app_theme.dart';
+import 'daily_word_editor_screen.dart';
 
 class QTScreen extends StatefulWidget {
   const QTScreen({super.key});
@@ -21,11 +22,31 @@ class _QTScreenState extends State<QTScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAdminMode = context.watch<AppProvider>().isAdminMode;
+    
+    if (isAdminMode) {
+      return Scaffold(
+        backgroundColor: Colors.grey[50],
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(LucideIcons.menu, color: Colors.black),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+          title: const Text('말씀/묵상 관리', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: _buildCalendarMode(context),
+      );
+    }
+    
     return _buildCalendarMode(context);
   }
 
   Widget _buildCalendarMode(BuildContext context) {
-    final qtLogs = context.watch<AppProvider>().qtLogs;
+    final provider = context.watch<AppProvider>(); // Get provider
+    final qtLogs = provider.qtLogs;
+    final user = provider.user; // Get current user
     final word = todaysWord;
 
     // Calendar Calculations
@@ -43,7 +64,8 @@ class _QTScreenState extends State<QTScreen> {
       ..sort((a, b) => b.id.compareTo(a.id)); // Newest first
 
     // Check if I wrote today
-    final todayLogIndex = qtLogs.indexWhere((l) => l.date == currentDate && l.userId == currentUser.id);
+    final userId = user?.id ?? 'guest';
+    final todayLogIndex = qtLogs.indexWhere((l) => l.date == currentDate && l.userId == userId);
     final todayLog = todayLogIndex != -1 ? qtLogs[todayLogIndex] : null;
 
     return SingleChildScrollView(
@@ -51,70 +73,73 @@ class _QTScreenState extends State<QTScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Top Banner (Unchanged logic, just simplified code structure if needed, keeping mostly same)
-          Container(
-            padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
-            decoration: const BoxDecoration(
-              gradient: AppTheme.primaryGradient,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(LucideIcons.sparkles, color: Colors.white54, size: 14),
-                    const SizedBox(width: 6),
-                    Text(
-                      "TODAY'S WORD",
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.5,
+
+          // Top Banner - Hide for Admins
+          if (!provider.isAdminMode)
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+              decoration: const BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(LucideIcons.sparkles, color: Colors.white54, size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        "TODAY'S WORD",
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  word.scripture,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    height: 1.5,
-                    fontWeight: FontWeight.w500,
+                    ],
                   ),
-                ),
-                const SizedBox(height: 20),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => QTWriteScreen(existingLog: todayLog)),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      todayLog != null ? '오늘의 묵상 수정' : '오늘의 묵상 쓰기',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  const SizedBox(height: 12),
+                  Text(
+                    word.scripture,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      height: 1.5,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => QTWriteScreen(existingLog: todayLog)),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        todayLog != null ? '오늘의 묵상 수정' : '오늘의 묵상 쓰기',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          
 
           Padding(
             padding: const EdgeInsets.all(24),
@@ -150,16 +175,26 @@ class _QTScreenState extends State<QTScreen> {
                 const SizedBox(height: 16),
                 
                 // Legend
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _LegendItem(color: Colors.yellow[400]!, label: 'All'),
-                    const SizedBox(width: 12),
-                    _LegendItem(color: Colors.green[400]!, label: 'Me'),
-                    const SizedBox(width: 12),
-                    _LegendItem(color: Colors.blue[400]!, label: 'Group'),
-                  ],
-                ),
+                if (!provider.isAdminMode)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _LegendItem(color: Colors.yellow[400]!, label: 'All'),
+                      const SizedBox(width: 12),
+                      _LegendItem(color: Colors.green[400]!, label: 'Me'),
+                      const SizedBox(width: 12),
+                      _LegendItem(color: Colors.blue[400]!, label: 'Group'),
+                    ],
+                  )
+                else
+                   Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _LegendItem(color: AppTheme.primary, label: '말씀 등록됨'),
+                      const SizedBox(width: 12),
+                      _LegendItem(color: Colors.grey[300]!, label: '미등록'),
+                    ],
+                  ),
                 const SizedBox(height: 16),
 
                 // Calendar Grid
@@ -205,17 +240,32 @@ class _QTScreenState extends State<QTScreen> {
                             final day = index + 1;
                             final currentDayDate = DateTime(_focusedMonth.year, _focusedMonth.month, day);
                             final dateStr = dateFormat.format(currentDayDate);
-                            final dayLogs = qtLogs.where((l) => l.date == dateStr).toList();
-                            final hasMe = dayLogs.any((l) => l.userId == currentUser.id);
-                            final hasOthers = dayLogs.any((l) => l.userId != currentUser.id);
                             
+                            // Role-Based Logic
                             Color? dotColor;
-                            if (hasMe && hasOthers) {
-                              dotColor = Colors.yellow[400];
-                            } else if (hasMe) {
-                              dotColor = Colors.green[400];
-                            } else if (hasOthers) {
-                              dotColor = Colors.blue[400];
+                            final isAdmin = provider.isAdminMode;
+
+                            if (isAdmin) {
+                              // Check if Daily Word exists for this date
+                              // Mock logic: assume today has word, others don't for now
+                              // In real app, check provider.dailyWords map
+                              if (dateStr == currentDate) { // Mock: only today has word
+                                dotColor = AppTheme.primary;
+                              }
+                            } else {
+                              // User Logic
+                              final dayLogs = qtLogs.where((l) => l.date == dateStr).toList();
+                              final myId = user?.id ?? 'guest';
+                              final hasMe = dayLogs.any((l) => l.userId == myId);
+                              final hasOthers = dayLogs.any((l) => l.userId != myId);
+                              
+                              if (hasMe && hasOthers) {
+                                dotColor = Colors.yellow[400];
+                              } else if (hasMe) {
+                                dotColor = Colors.green[400];
+                              } else if (hasOthers) {
+                                dotColor = Colors.blue[400];
+                              }
                             }
                             
                             final isSelected = DateUtils.isSameDay(currentDayDate, _selectedDate);
@@ -226,6 +276,16 @@ class _QTScreenState extends State<QTScreen> {
                                 setState(() {
                                   _selectedDate = currentDayDate;
                                 });
+                                if (isAdmin) {
+                                  // Navigate to Word Editor
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      // Pass the selected date to editor (TODO: Update Editor to accept date)
+                                      builder: (context) => const DailyWordEditorScreen(), 
+                                    ),
+                                  );
+                                }
                               },
                               child: SizedBox(
                                 width: 30,
@@ -399,9 +459,22 @@ class _QTWriteScreenState extends State<QTWriteScreen> {
       return;
     }
 
+    // Get current user from provider
+    final user = context.read<AppProvider>().user;
+    
+    // If guest, show a message but allowing saving locally (in memory) for now
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('로그인하지 않아 기기에만 임시 저장됩니다.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+
     final newLog = QTLog(
       id: widget.existingLog?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      userId: currentUser.id, // Add this
+      userId: user?.id ?? 'guest', // Use real user ID or guest
       date: currentDate,
       title: _titleController.text,
       content: _contentController.text,
@@ -416,6 +489,11 @@ class _QTWriteScreenState extends State<QTWriteScreen> {
       context.read<AppProvider>().addQTLog(newLog);
     }
     Navigator.pop(context);
+    
+    // If guest, show login suggestion after saving
+    if (user == null) {
+       // Optional: Could trigger login dialog here or just let them be
+    }
   }
 
   @override
